@@ -22,7 +22,7 @@ class Delta_Mush_CPU : public MPxDeformerNode
 {
 public:
 						Delta_Mush_CPU();
-	virtual				~Delta_Mush_CPU(); 
+	//virtual				~Delta_Mush_CPU(); 
 	static  void*		creator();
 	static  MStatus		initialize();
 
@@ -30,7 +30,7 @@ public:
 	virtual MStatus setDependentsDirty(const MPlug& plug, MPlugArray& plugArray) override;
 
 private:
-	void initData(MObject& mesh, int iters);
+	void initData(MObject& mesh);
 	void averageRelax(MPointArray& source, MPointArray& target, int iter, double amountV);
 	void computeDelta(MPointArray& source, MPointArray& target);
 	void rebindData(MObject& mesh, int iter, double amount);
