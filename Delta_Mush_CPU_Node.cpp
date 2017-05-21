@@ -1,83 +1,32 @@
 #include "Delta_Mush_CPU_Node.h"
 
-#include <maya/MPxDeformerNode.h>
-#include <maya/MTypeId.h>
-#include <maya/MIntArray.h>
-#include <maya/MVectorArray.h>
-#include <maya/MPointArray.h>
-#include <maya/MPlug.h>
-#include <maya/MDataBlock.h>
-#include <maya/MDataHandle.h>
 #include <maya/MGlobal.h>
-#include <vector>
+#include <maya/MPxDeformerNode.h>
+#include <maya/MItGeometry.h>
+#include <maya/MItMeshVertex.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MFnTypedAttribute.h>
+#include <maya/MPoint.h>
+#include <maya/MVector.h>
+#include <maya/MFnMesh.h>
+#include <maya/MPointArray.h>
+#include <maya/MMatrix.h>
+#include <maya/MPlug.h>
 
-// You MUST change this to a unique value!!!  The id is a 32bit value used
-// to identify this type of node in the binary file format.  
-//
-#error change the following to a unique value and then erase this line 
-MTypeId     Delta_Mush_CPU::id( 0x00001 );
+#define SMALL (float)1e-6
 
-// Example attributes
-// 
-MObject     Delta_Mush_CPU::input;        
-MObject     Delta_Mush_CPU::output;       
+MTypeId     Delta_Mush_CPU::id( 0x0011ff84 );
 
-Delta_Mush_CPU::Delta_Mush_CPU() {}
-Delta_Mush_CPU::~Delta_Mush_CPU() {}
+MObject     Delta_Mush_CPU::rebind;
+MObject     Delta_Mush_CPU::referenceMesh;
+MObject     Delta_Mush_CPU::iterations;
+MObject     Delta_Mush_CPU::applyDelta;
+MObject     Delta_Mush_CPU::amount;
+MObject     Delta_Mush_CPU::globalScale;
 
-MStatus Delta_Mush_CPU::compute( const MPlug& plug, MDataBlock& data )
-//
-//	Description:
-//		This method computes the value of the given output plug based
-//		on the values of the input attributes.
-//
-//	Arguments:
-//		plug - the plug to compute
-//		data - object that provides access to the attributes for this node
-//
+Delta_Mush_CPU::Delta_Mush_CPU(): initialized(false)
 {
-	MStatus returnStatus;
- 
-	// Check which output attribute we have been asked to compute.  If this 
-	// node doesn't know how to compute it, we must return 
-	// MS::kUnknownParameter.
-	// 
-	if( plug == output )
-	{
-		// Get a handle to the input attribute that we will need for the
-		// computation.  If the value is being supplied via a connection 
-		// in the dependency graph, then this call will cause all upstream  
-		// connections to be evaluated so that the correct value is supplied.
-		// 
-		MDataHandle inputData = data.inputValue( input, &returnStatus );
-
-		if( returnStatus != MS::kSuccess )
-			MGlobal::displayError( "Node Delta_Mush_CPU_ cannot get value\n" );
-		else
-		{
-			// Read the input value from the handle.
-			//
-			float result = inputData.asFloat();
-
-			// Get a handle to the output attribute.  This is similar to the
-			// "inputValue" call above except that no dependency graph 
-			// computation will be done as a result of this call.
-			// 
-			MDataHandle outputHandle = data.outputValue( Delta_Mush_CPU::output );
-			// This just copies the input value through to the output.  
-			// 
-			outputHandle.set( result );
-			// Mark the destination plug as being clean.  This will prevent the
-			// dependency graph from repeating this calculation until an input 
-			// of this node changes.
-			// 
-			data.setClean(plug);
-		}
-	} else {
-		return MS::kUnknownParameter;
-	}
-
-	return MS::kSuccess;
+	targetPos.setLength(0);
 }
 
 void* Delta_Mush_CPU::creator()
@@ -94,50 +43,57 @@ void* Delta_Mush_CPU::creator()
 }
 
 MStatus Delta_Mush_CPU::initialize()
-//
-//	Description:
-//		This method is called to create and initialize all of the attributes
-//      and attribute dependencies for this node type.  This is only called 
-//		once when the node type is registered with Maya.
-//
-//	Return Values:
-//		MS::kSuccess
-//		MS::kFailure
-//		
 {
-	// This sample creates a single input float attribute and a single
-	// output float attribute.
-	//
-	MFnNumericAttribute nAttr;
-	MStatus				stat;
+	MFnNumericAttribute numericAttr;
+	MFnTypedAttribute tAttr;
 
-	input = nAttr.create( "input", "in", MFnNumericData::kFloat, 0.0 );
-	// Attribute will be written to files when this type of node is stored
- 	nAttr.setStorable(true);
-	// Attribute is keyable and will show up in the channel box
- 	nAttr.setKeyable(true);
+	// global scale
+	globalScale = numericAttr.create("globalScale", "gls", MFnNumericData::kDouble, 1.0);
+	numericAttr.setKeyable(true);
+	numericAttr.setStorable(true);
+	numericAttr.setMin(0.0001);
+	addAttribute(globalScale);
 
-	output = nAttr.create( "output", "out", MFnNumericData::kFloat, 0.0 );
-	// Attribute is read-only because it is an output attribute
-	nAttr.setWritable(false);
-	// Attribute will not be written to files when this type of node is stored
-	nAttr.setStorable(false);
+	rebind = numericAttr.create("rebind", "rbn", MFnNumericData::kBoolean, 0);
+	numericAttr.setKeyable(true);
+	numericAttr.setStorable(true);
+	addAttribute(globalScale);
 
-	// Add the attributes we have created to the node
-	//
-	stat = addAttribute( input );
-		if (!stat) { stat.perror("addAttribute"); return stat;}
-	stat = addAttribute( output );
-		if (!stat) { stat.perror("addAttribute"); return stat;}
+	applyDelta = numericAttr.create("applyDelta", "apdlt", MFnNumericData::kDouble, 1.0);
+	numericAttr.setKeyable(true);
+	numericAttr.setStorable(true);
+	numericAttr.setMin(0);
+	numericAttr.setMax(1);
+	addAttribute(applyDelta);
 
-	// Set up a dependency between the input and the output.  This will cause
-	// the output to be marked dirty when the input changes.  The output will
-	// then be recomputed the next time the value of the output is requested.
-	//
-	stat = attributeAffects( input, output );
-		if (!stat) { stat.perror("attributeAffects"); return stat;}
+	iterations = numericAttr.create("iterations", "itr", MFnNumericData::kInt, 0);
+	numericAttr.setKeyable(true);
+	numericAttr.setStorable(true);
+	numericAttr.setMin(0);
+	addAttribute(iterations);
+
+	amount = numericAttr.create("amount", "am", MFnNumericData::kDouble, 0.5);
+	numericAttr.setKeyable(true);
+	numericAttr.setStorable(true);
+	numericAttr.setMin(0);
+	numericAttr.setMax(1);
+	addAttribute(amount);
+
+	referenceMesh = tAttr.create("referenceMesh", "rfm", MFnData::kMesh);
+	tAttr.setKeyable(true);
+	tAttr.setStorable(true);
+	tAttr.setWritable(true);
+	addAttribute(referenceMesh);
+
+	attributeAffects(referenceMesh, outputGeom);
+	attributeAffects(rebind, outputGeom);
+	attributeAffects(iterations, outputGeom);
+	attributeAffects(applyDelta, outputGeom);
+	attributeAffects(amount, outputGeom);
+	attributeAffects(globalScale, outputGeom);
+
+	MGlobal::executeCommand("makePaintable -attrType multiFloat -sm deformer Delta_Mush_CPU weights");
 
 	return MS::kSuccess;
-
 }
 
