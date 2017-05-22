@@ -1,11 +1,3 @@
-//
-// Copyright (C) 
-// 
-// File: pluginMain.cpp
-//
-// Author: Maya Plug-in Wizard 2.0
-//
-
 #include "Delta_Mush_CPU_Node.h"
 
 #include <maya/MFnPlugin.h>
@@ -25,10 +17,10 @@ MStatus initializePlugin( MObject obj )
 	MFnPlugin plugin( obj, "", "2017", "Any");
 
 	status = plugin.registerNode( "Delta_Mush_CPU_", Delta_Mush_CPU::id, Delta_Mush_CPU::creator,
-								  Delta_Mush_CPU::initialize );
+								  Delta_Mush_CPU::initialize, MPxNode::kDeformerNode);
 	if (!status) {
 		status.perror("registerNode");
-		return status;
+		return status; 
 	}
 
 	return status;

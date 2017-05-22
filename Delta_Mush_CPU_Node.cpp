@@ -1,7 +1,6 @@
 #include "Delta_Mush_CPU_Node.h"
 
 #include <maya/MGlobal.h>
-#include <maya/MPxDeformerNode.h>
 #include <maya/MItGeometry.h>
 #include <maya/MItMeshVertex.h>
 #include <maya/MFnNumericAttribute.h>
