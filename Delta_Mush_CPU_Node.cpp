@@ -96,6 +96,7 @@ MStatus Delta_Mush_CPU::initialize()
 	return MS::kSuccess;
 }
 
+// arguments are type matters only, ignore the argument names, they don't have to be the same name as the header files.
 MStatus Delta_Mush_CPU::deform(MDataBlock& data, MItGeometry& iter, const MMatrix& localTOWorldMatrix, unsigned int mIndex)
 {
 	// preliminary check: if the reference mesh is connected
