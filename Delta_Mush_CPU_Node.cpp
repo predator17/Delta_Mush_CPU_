@@ -56,7 +56,7 @@ MStatus Delta_Mush_CPU::initialize()
 	rebind = numericAttr.create("rebind", "rbn", MFnNumericData::kBoolean, 0);
 	numericAttr.setKeyable(true);
 	numericAttr.setStorable(true);
-	addAttribute(globalScale);
+	addAttribute(rebind);
 
 	applyDelta = numericAttr.create("applyDelta", "apdlt", MFnNumericData::kDouble, 1.0);
 	numericAttr.setKeyable(true);
